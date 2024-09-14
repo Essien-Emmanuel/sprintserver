@@ -1,0 +1,19 @@
+{
+  "name": "3express",
+  "version": "1.0.0",
+  "description": "A basic library for working with the http modules'",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "http"
+  ],
+  "author": "Essien Emmanuel",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
