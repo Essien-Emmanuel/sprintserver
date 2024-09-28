@@ -1,15 +1,52 @@
 import http from "http";
 
-class App {
+export function SSResponse(resp) {
+  resp.send = function (body) {
+    resp.writeHead(200, { "Content-Type": "text/plain" });
+    resp.write(body);
+    resp.end();
+    return this;
+  };
+
+  resp.json = function (body) {
+    console.log(body);
+    resp.writeHead(200, { "Content-Type": "application/json" });
+    resp.write(JSON.stringify(body));
+    resp.end();
+    return this;
+  };
+
+  return resp;
+}
+
+class SprintServer {
   constructor() {
     this.routers = {
       get: {},
     };
   }
 
-  get(url, reqHandler) {
-    // this.routers.get.push({ url, reqHandler });
+  _get(url, reqHandler) {
     this.routers.get[url] = reqHandler;
+  }
+
+  get(url, ...middlewares) {
+    this.routers.get[url] = {};
+
+    if (middlewares.length < 1) {
+      throw new Error("No request handler found");
+    }
+
+    if (middlewares.length === 1) {
+      this.routers.get[url]["reqHandler"] = middlewares[0];
+      return;
+    }
+
+    if (middlewares.length > 1) {
+      this.routers.get[url]["middlewares"] = middlewares.slice(0, -1);
+      this.routers.get[url]["reqHandler"] = middlewares[middlewares.length - 1];
+      return;
+    }
   }
 
   Router() {
@@ -22,55 +59,57 @@ class App {
   use() {
     console.log("using middleware...");
   }
-  listen(port = 8080, host = "127.0.0.1", cb) {
+  listen(port = 8080, cb) {
     const self = this;
     const server = http.createServer(function (req, resp) {
-      // if GET
-      //if POST
-      // if PUT
-      //if DELETE
-      //if PATCH
-      //if OPTIONs
-      // self.reqHandler(req, resp);
+      console.log("here");
+      if (!req.method) {
+        throw new Error("Http method is not specified");
+      }
+
+      if (!req.url) {
+        throw new Error("request url is not specified");
+      }
+      if (!Object.keys(self.routers).includes(req.method.toLowerCase())) {
+        throw new Error("Not found");
+      }
+
+      const extResp = SSResponse(resp);
+
       const targetRoute = self.routers[req.method.toLowerCase()];
       if (!targetRoute[req.url]) {
         resp.end("Endpoint not found");
+        return;
       }
       const targetHandler = targetRoute[req.url];
-      targetHandler(req, resp);
-      // const endpointCount = targetRoute.reduce((acc, endpoint) => {
-      //   if (endpoint.url === req.url) {
-      //     endpoint.reqHandler(req, resp);
-      //     return ++acc;
-      //   }
-      //   return acc;
-      // }, 0);
-
-      // if (endpointCount < 1) {
-      //   resp.end("Endpoint not found");
-      // }
+      console.log(targetRoute);
+      return targetHandler(req, extResp);
     });
 
-    server.listen(port, host, cb());
+    server.listen(port, cb());
   }
 }
 
-const app = new App();
+/** usage */
+const app = new SprintServer();
 const router = app.Router();
 
-router.get("/", (req, resp) => {
-  resp.end("getting /");
-  // resp.setHeader("Content-Type", "application/json");
-  // console.log(req.method);
-  // resp.writeHead(200, { "Content-Type": "application/json" });
-  // resp.write(JSON.stringify({ msg: "hello" }));
-  // resp.end("OK");
-});
+router.get(
+  "/",
+  () => {
+    console.log("middleware");
+  },
+  (req, resp) => {
+    resp.send("getting /");
+  }
+);
 
 router.get("/home", (req, resp) => {
-  resp.end("getting /home");
+  resp.json("getting /home");
 });
 
-app.listen(1234, "127.0.0.1", () => {
+app.listen(1234, () => {
   console.log("server spinning at port 1234");
 });
+
+export default SprintServer;
