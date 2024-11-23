@@ -1,6 +1,8 @@
+"use strict";
+
 import http from "http";
 
-export function SSResponse(resp) {
+export function SSResponse(req, resp) {
   resp.send = function (body) {
     resp.writeHead(200, { "Content-Type": "text/plain" });
     resp.write(body);
@@ -43,8 +45,8 @@ class SprintServer {
     }
 
     if (middlewares.length > 1) {
-      this.routers.get[url]["middlewares"] = middlewares.slice(0, -1);
-      this.routers.get[url]["reqHandler"] = middlewares[middlewares.length - 1];
+      this.routers.get[url]["reqHandler"] = middlewares.pop();
+      this.routers.get[url]["middlewares"] = middlewares;
       return;
     }
   }
@@ -59,10 +61,11 @@ class SprintServer {
   use() {
     console.log("using middleware...");
   }
+
   listen(port = 8080, cb) {
     const self = this;
+
     const server = http.createServer(function (req, resp) {
-      console.log("here");
       if (!req.method) {
         throw new Error("Http method is not specified");
       }
@@ -74,16 +77,40 @@ class SprintServer {
         throw new Error("Not found");
       }
 
-      const extResp = SSResponse(resp);
-
       const targetRoute = self.routers[req.method.toLowerCase()];
+
       if (!targetRoute[req.url]) {
         resp.end("Endpoint not found");
         return;
       }
-      const targetHandler = targetRoute[req.url];
-      console.log(targetRoute);
-      return targetHandler(req, extResp);
+
+      const endpoint = targetRoute[req.url];
+      const targetHandler = endpoint["reqHandler"];
+      const middlewares = endpoint["middlewares"];
+      const extResp = SSResponse(req, resp);
+
+      function runMiddlewares(req, middlewares, resp) {
+        const createProceedFn = (req) => {
+          return () => {
+            req.proceed = true;
+          };
+        };
+
+        for (const middleware of middlewares) {
+          req.proceed = false;
+          const proceed = createProceedFn(req);
+          middleware(req, resp, proceed);
+
+          if (!req.proceed) break;
+        }
+      }
+
+      //run middlewares
+      if ("middlewares" in endpoint) {
+        runMiddlewares(req, middlewares, extResp);
+      }
+
+      targetHandler(req, extResp);
     });
 
     server.listen(port, cb());
@@ -96,8 +123,21 @@ const router = app.Router();
 
 router.get(
   "/",
-  () => {
-    console.log("middleware");
+  (req, resp, proceed) => {
+    req.new = "setting this newly";
+    console.log("middleware...");
+    proceed();
+  },
+  (req, resp, proceed) => {
+    req.new = "setting this newly";
+    console.log("middleware 2...");
+    // resp.end("ended");
+    // proceed();
+  },
+  (req, resp, proceed) => {
+    req.new = "setting this newly";
+    console.log("middleware 3...");
+    proceed();
   },
   (req, resp) => {
     resp.send("getting /");
