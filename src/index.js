@@ -4,17 +4,31 @@ import http from "http";
 
 export function SSResponse(req, resp) {
   resp.send = function (body) {
+    if (resp.isSend) {
+      console.log(
+        "Check Middleware responses. Cannot write headers after they are sent to the client"
+      );
+      return;
+    }
     resp.writeHead(200, { "Content-Type": "text/plain" });
     resp.write(body);
     resp.end();
+    resp.isSend = true;
     return this;
   };
 
   resp.json = function (body) {
+    if (resp.isSend) {
+      console.log(
+        "Check Middleware responses. Cannot write headers after they are sent to the client"
+      );
+      return;
+    }
     console.log(body);
     resp.writeHead(200, { "Content-Type": "application/json" });
     resp.write(JSON.stringify(body));
     resp.end();
+    resp.isSend = true;
     return this;
   };
 
@@ -84,6 +98,8 @@ class SprintServer {
         return;
       }
 
+      resp.isSend = false;
+
       const endpoint = targetRoute[req.url];
       const targetHandler = endpoint["reqHandler"];
       const middlewares = endpoint["middlewares"];
@@ -109,7 +125,6 @@ class SprintServer {
       if ("middlewares" in endpoint) {
         runMiddlewares(req, middlewares, extResp);
       }
-
       targetHandler(req, extResp);
     });
 
@@ -132,12 +147,13 @@ router.get(
     req.new = "setting this newly";
     console.log("middleware 2...");
     // resp.end("ended");
-    // proceed();
+    proceed();
   },
   (req, resp, proceed) => {
     req.new = "setting this newly";
     console.log("middleware 3...");
-    proceed();
+    // resp.send("bypass");
+    // proceed();
   },
   (req, resp) => {
     resp.send("getting /");
