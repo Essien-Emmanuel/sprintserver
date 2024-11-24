@@ -35,40 +35,54 @@ export function SSResponse(req, resp) {
   return resp;
 }
 
+// get req body
+async function bodyParser(req) {
+  return new Promise((resolve, reject) => {
+    req.on("data", (chunk) => {
+      const reqBody = chunk.toString();
+      const bodyObj = JSON.parse(reqBody);
+      return resolve(bodyObj);
+    });
+  });
+}
+
 class SprintServer {
   constructor() {
     this.routers = {
       get: {},
+      post: {},
+      put: {},
+      patch: {},
+      delete: {},
     };
   }
 
-  _get(url, reqHandler) {
-    this.routers.get[url] = reqHandler;
-  }
+  mapMethod(httpMtd) {
+    return (url, ...middlewares) => {
+      this.routers[`${httpMtd}`][url] = {};
 
-  get(url, ...middlewares) {
-    this.routers.get[url] = {};
+      if (middlewares.length < 1) {
+        throw new Error("No request handler found");
+      }
 
-    if (middlewares.length < 1) {
-      throw new Error("No request handler found");
-    }
+      if (middlewares.length === 1) {
+        this.routers[`${httpMtd}`][url]["reqHandler"] = middlewares[0];
+        return;
+      }
 
-    if (middlewares.length === 1) {
-      this.routers.get[url]["reqHandler"] = middlewares[0];
-      return;
-    }
-
-    if (middlewares.length > 1) {
-      this.routers.get[url]["reqHandler"] = middlewares.pop();
-      this.routers.get[url]["middlewares"] = middlewares;
-      return;
-    }
+      if (middlewares.length > 1) {
+        this.routers[`${httpMtd}`][url]["reqHandler"] = middlewares.pop();
+        this.routers[`${httpMtd}`][url]["middlewares"] = middlewares;
+        return;
+      }
+    };
   }
 
   Router() {
     const self = this;
     return {
-      get: self.get.bind(self),
+      get: self.mapMethod("get").bind(self),
+      post: self.mapMethod("post").bind(self),
     };
   }
 
@@ -79,7 +93,7 @@ class SprintServer {
   listen(port = 8080, cb) {
     const self = this;
 
-    const server = http.createServer(function (req, resp) {
+    const server = http.createServer(async function (req, resp) {
       if (!req.method) {
         throw new Error("Http method is not specified");
       }
@@ -90,6 +104,9 @@ class SprintServer {
       if (!Object.keys(self.routers).includes(req.method.toLowerCase())) {
         throw new Error("Not found");
       }
+
+      const reqBody = await bodyParser(req);
+      req.body = reqBody;
 
       const targetRoute = self.routers[req.method.toLowerCase()];
 
@@ -141,19 +158,6 @@ router.get(
   (req, resp, proceed) => {
     req.new = "setting this newly";
     console.log("middleware...");
-    proceed();
-  },
-  (req, resp, proceed) => {
-    req.new = "setting this newly";
-    console.log("middleware 2...");
-    // resp.end("ended");
-    proceed();
-  },
-  (req, resp, proceed) => {
-    req.new = "setting this newly";
-    console.log("middleware 3...");
-    // resp.send("bypass");
-    // proceed();
   },
   (req, resp) => {
     resp.send("getting /");
@@ -162,6 +166,19 @@ router.get(
 
 router.get("/home", (req, resp) => {
   resp.json("getting /home");
+});
+
+router.post("/", (req, resp, proceed) => {
+  const data = req.body;
+
+  resp.json({
+    data: {
+      name: data.name,
+      email: data.email,
+      status: "new user",
+      date: Date.now(),
+    },
+  });
 });
 
 app.listen(1234, () => {
