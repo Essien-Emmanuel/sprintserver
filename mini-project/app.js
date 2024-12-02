@@ -6,9 +6,15 @@ const router = app.Router();
 
 router.get(
   "/",
-  () => {},
+  (req, res, proceed) => {
+    console.log("authenticating request");
+    proceed();
+  },
+  (req, res, next) => {
+    console.log("validating role");
+  },
   (req, resp) => {
-    resp.send("getting anoterh /");
+    resp.send("This is the first request test /");
   }
 );
 

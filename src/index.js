@@ -35,7 +35,6 @@ export function SSResponse(req, resp) {
   return resp;
 }
 
-// get req body
 async function bodyParser(req) {
   return new Promise((resolve, reject) => {
     req.on("data", (chunk) => {
@@ -83,11 +82,14 @@ class SprintServer {
     return {
       get: self.mapMethod("get").bind(self),
       post: self.mapMethod("post").bind(self),
+      put: self.mapMethod("put").bind(self),
+      patch: self.mapMethod("patch").bind(self),
+      delete: self.mapMethod("delete").bind(self),
     };
   }
 
-  use() {
-    console.log("using middleware...");
+  use(middlewareFn) {
+    console.log("using middleware...", middlewareFn);
   }
 
   listen(port = 8080, cb) {
@@ -105,6 +107,9 @@ class SprintServer {
         throw new Error("Not found");
       }
 
+      // use middlewares
+
+      //
       const reqBody = await bodyParser(req);
       req.body = reqBody;
 
@@ -181,8 +186,8 @@ router.post("/", (req, resp, proceed) => {
   });
 });
 
-app.listen(1234, () => {
-  console.log("server spinning at port 1234");
-});
+// app.listen(1234, () => {
+//   console.log("server spinning at port 1234");
+// });
 
 export default SprintServer;
